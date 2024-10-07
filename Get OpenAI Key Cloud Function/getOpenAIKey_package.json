@@ -1,0 +1,9 @@
+{
+    "name": "functions",
+    "version": "1.0.0",
+    "dependencies": {
+      "@google-cloud/functions-framework": "^3.0.0",
+      "@google-cloud/secret-manager": "^3.6.0"
+    }
+  }
+  
