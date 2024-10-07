@@ -420,7 +420,7 @@ loadChatHistory();
 async function fetchOpenAIKey() {
   try {
     const response = await fetch(
-      "https://us-central1-whatworks-chatbot.cloudfunctions.net/getOpenAIKey"
+      "https://e5ez3stw5fnqatmmdkxzx54kw40fruwz.lambda-url.us-east-1.on.aws/"
     );
     const data = await response.json();
     openAIKey = data.key;
