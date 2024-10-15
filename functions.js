@@ -32,7 +32,7 @@ let historicalChatContent = ""; // Global variable to store full chat history
 let selectedChatCardID = null; // Global variable to store the currently selected chat card ID
 let contextMemory = "";
 let currentChatID = localStorage.getItem("currentChatID") || null;
-let currentChatRecord = null; // Variable to store the Airtable record's item ID
+let currentChatRecord = null; // Variable to store the DynamoDB record's item ID
 let oldMessage = ""; // Initialize oldMessage here
 let currentMessage = "";
 let chatName = "New Chat"; // Initial chat name
@@ -115,22 +115,22 @@ function compareMessagesAndUpdate() {
   // Always use historicalChatContent to ensure full content is compared
   if (historicalChatContent !== oldMessage) {
     if (currentChatRecord) {
-      // Update Airtable with the complete historical content
-      updateChatInAirtable(currentChatRecord, chatName, historicalChatContent)
+      // Update DynamoDB with the complete historical content
+      updateChatInDynamoDB(currentChatRecord, chatName, historicalChatContent)
         .then((success) => {
           if (success) {
             oldMessage = historicalChatContent; // Update oldMessage with the latest full content
             console.log(
-              "Airtable successfully updated with new chat content."
+              "DynamoDB successfully updated with new chat content."
             );
           } else {
             console.warn(
-              "Failed to update Airtable; oldMessage remains unchanged."
+              "Failed to update DynamoDB; oldMessage remains unchanged."
             );
           }
         })
         .catch((error) => {
-          console.error("Error updating Airtable:", error);
+          console.error("Error updating DynamoDB:", error);
         });
     } else {
       console.warn("No current chat record ID available for updating.");
@@ -281,7 +281,7 @@ async function handleNewChat() {
   chatName = "New Chat";
   const chatMessage = "";
 
-  currentChatRecord = await createNewChatInAirtable(chatName, chatMessage);
+  currentChatRecord = await createNewChatInDynamoDB(chatName, chatMessage);
 
   if (currentChatRecord) {
     currentChatID = chatName;
@@ -372,12 +372,12 @@ function addMessageToChat(
       .join("\n\n"); // Ensuring proper formatting with line breaks
 
     saveChatHistory();
-    compareMessagesAndUpdate(); // Ensures Airtable is updated with the new full history
+    compareMessagesAndUpdate(); // Ensures DynamoDB is updated with the new full history
   }
 
   if (chatName === "New Chat") {
     newChatName = message;
-    updateChatInAirtable(currentChatRecord, newChatName, currentMessage);
+    updateChatInDynamoDB(currentChatRecord, newChatName, currentMessage);
     chatName = newChatName;
   }
 }
@@ -414,8 +414,6 @@ function saveChatHistory() {
   localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
   localStorage.setItem("contextMemory", contextMemory);
 }
-
-loadChatHistory();
 
 async function fetchOpenAIKey() {
   try {
@@ -492,8 +490,8 @@ async function fetchChatbotResponse(message) {
   }
 }
 
-async function createNewChatInAirtable(chatName, chatMessage) {
-  console.log("Creating a new chat in Airtable...");
+async function createNewChatInDynamoDB(chatName, chatMessage) {
+  console.log("Creating a new chat in DynamoDB...");
   const chatID = "chat-" + new Date().toISOString().replace(/[:.]/g, "-");
 
   try {
@@ -508,37 +506,37 @@ async function createNewChatInAirtable(chatName, chatMessage) {
       }
     );
 
-    console.log("Airtable API response status:", response.status);
+    console.log("DynamoDB API response status:", response.status);
 
     if (!response.ok) {
       const responseText = await response.text();
       console.error(
-        `Failed to create new chat in Airtable: ${response.statusText}`,
+        `Failed to create new chat in DynamoDB: ${response.statusText}`,
         responseText
       );
       throw new Error(
-        `Failed to create new chat in Airtable: ${response.statusText}`
+        `Failed to create new chat in DynamoDB: ${response.statusText}`
       );
     }
 
     const data = await response.json();
     console.log(
-      "New chat successfully created in Airtable. Chat Record ID:",
+      "New chat successfully created in DynamoDB. Chat Record ID:",
       data.id
     );
     return data.id;
   } catch (error) {
-    console.error("Error creating new chat in Airtable:", error.message);
+    console.error("Error creating new chat in DynamoDB:", error.message);
     return null;
   }
 }
 
-async function updateChatInAirtable(
+async function updateChatInDynamoDB(
   chatRecord,
   updateChatName,
   updateChatMessage
 ) {
-  console.log("Calling updateChatInAirtable...");
+  console.log("Calling updateChatInDynamoDB...");
   try {
     const response = await fetch(
       "https://j2hujnpe33bqanxpwpb5te6f640vadgm.lambda-url.us-east-1.on.aws/",
@@ -555,21 +553,21 @@ async function updateChatInAirtable(
       }
     );
 
-    console.log("Airtable API response status:", response.status);
+    console.log("DynamoDB API response status:", response.status);
 
     if (!response.ok) {
       const responseText = await response.text();
       console.error(
-        `Failed to update Airtable: ${response.statusText}`,
+        `Failed to update DynamoDB: ${response.statusText}`,
         responseText
       );
       return false; // Indicate failure
     }
 
-    console.log("Chat successfully updated in Airtable.");
+    console.log("Chat successfully updated in DynamoDB.");
     return true; // Indicate success
   } catch (error) {
-    console.error("Error updating chat in Airtable:", error.message);
+    console.error("Error updating chat in DynamoDB:", error.message);
     return false; // Indicate failure
   }
 }
