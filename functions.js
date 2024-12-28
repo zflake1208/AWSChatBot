@@ -39,6 +39,12 @@ let chatName = "New Chat"; // Initial chat name
 let newChatName = "";
 let openAIKey = null; // Declare openAIKey globally
 
+let updateChatURL = "https://g42tg4abvt6nntxwdpz2px5guy0qruwv.lambda-url.us-east-2.on.aws/";
+let generateChatHistoryURL = "https://ijisntb7mkez3mqyqxsmxgjxfi0kctqo.lambda-url.us-east-2.on.aws/";
+let createChatURL = "https://gnafpvqyqyayakqy5n5i2tpq3q0plbbz.lambda-url.us-east-2.on.aws/";
+let getOpenAIKeyURL = "https://b3fts76rqvydafmqz6vkhmwttq0xatii.lambda-url.us-east-2.on.aws/";
+let loadChatFromHistoryURL = "https://cwgbszgsgyvsc5ewigmz7c5kmq0bewmz.lambda-url.us-east-2.on.aws/";
+
 //Used
 function resetChatVariables() {
   chatID = "";
@@ -143,9 +149,7 @@ function compareMessagesAndUpdate() {
 //Used
 async function fetchChatHistory() {
   try {
-    const response = await fetch(
-      "https://xsijoo4v5c2rfbk2bat57nn6ve0txlkv.lambda-url.us-east-1.on.aws/"
-    );
+    const response = await fetch(generateChatHistoryURL);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch chat history: ${response.statusText}`);
@@ -200,9 +204,7 @@ async function handleChatCardClick(historyChatID, historyChatName, chatCard) {
     const encodedChatID = encodeURIComponent(historyChatID);
     const encodedChatName = encodeURIComponent(historyChatName);
 
-    const response = await fetch(
-      `https://ainupfzsxkxw6ylqoiyws2gjxe0ozlzx.lambda-url.us-east-1.on.aws/?chatID=${encodedChatID}&chatName=${encodedChatName}`
-    );
+    const response = await fetch(loadChatFromHistoryURL + `?chatID=${encodedChatID}&chatName=${encodedChatName}`);
 
     if (!response.ok) {
       throw new Error(`Error loading chat: ${response.statusText}`);
@@ -417,9 +419,7 @@ function saveChatHistory() {
 
 async function fetchOpenAIKey() {
   try {
-    const response = await fetch(
-      "https://e5ez3stw5fnqatmmdkxzx54kw40fruwz.lambda-url.us-east-1.on.aws/"
-    );
+    const response = await fetch(getOpenAIKeyURL);
     const data = await response.json();
     openAIKey = data.key;
   } catch (error) {
@@ -496,7 +496,7 @@ async function createNewChatInDynamoDB(chatName, chatMessage) {
 
   try {
     const response = await fetch(
-      "https://26ah7dzvjzbjtt5d6ugajbrjme0dhzsa.lambda-url.us-east-1.on.aws/",
+      createChatURL,
       {
         method: "POST",
         headers: {
@@ -539,7 +539,7 @@ async function updateChatInDynamoDB(
   console.log("Calling updateChatInDynamoDB...");
   try {
     const response = await fetch(
-      "https://j2hujnpe33bqanxpwpb5te6f640vadgm.lambda-url.us-east-1.on.aws/",
+      updateChatURL,
       {
         method: "POST",
         headers: {
