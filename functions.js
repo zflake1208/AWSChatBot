@@ -44,6 +44,7 @@ let generateChatHistoryURL = "https://ijisntb7mkez3mqyqxsmxgjxfi0kctqo.lambda-ur
 let createChatURL = "https://gnafpvqyqyayakqy5n5i2tpq3q0plbbz.lambda-url.us-east-2.on.aws/";
 let getOpenAIKeyURL = "https://b3fts76rqvydafmqz6vkhmwttq0xatii.lambda-url.us-east-2.on.aws/";
 let loadChatFromHistoryURL = "https://cwgbszgsgyvsc5ewigmz7c5kmq0bewmz.lambda-url.us-east-2.on.aws/";
+let uploadFileURL = "https://vq2wr3dimmfeh4tftqd4msyeae0horoc.lambda-url.us-east-2.on.aws/";
 
 //Used
 function resetChatVariables() {
@@ -57,57 +58,6 @@ function resetChatVariables() {
   historicalChatContent = "";
   selectedChatCardID = null; // Global variable to store the currently selected chat card ID
   oldMessage = ""; // Reset oldMessage to empty when resetting variables
-}
-
-//Not Needed
-async function extractTextFromPptx(arrayBuffer) {
-  const zip = await JSZip.loadAsync(arrayBuffer);
-  let text = "";
-
-  const slideRegex = /ppt\/slides\/slide\d+\.xml/; // Regex to find slide files
-
-  const slideFiles = Object.keys(zip.files).filter((filename) =>
-    slideRegex.test(filename)
-  );
-
-  for (const filename of slideFiles) {
-    const slideContent = await zip.files[filename].async("string");
-
-    // Extract text from the XML content of each slide
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(slideContent, "application/xml");
-    const textElements = xmlDoc.getElementsByTagName("a:t");
-
-    for (const element of textElements) {
-      text += element.textContent + " ";
-    }
-  }
-
-  return text.trim();
-}
-
-//Not Needed
-async function extractTextFromImage(arrayBuffer) {
-  // Placeholder function for image extraction
-  // You can use Tesseract.js for OCR if needed
-  return "Image file processed. (Text extraction can be implemented with OCR)";
-}
-
-//Not Needed
-function extractTextFromMarkdown(text) {
-  // Convert Markdown to plain text or HTML using the marked library
-  return marked.parse(text);
-}
-
-//Not Needed
-function extractTextFromJson(text) {
-  try {
-    const jsonObject = JSON.parse(text);
-    return JSON.stringify(jsonObject, null, 2); // Pretty print JSON
-  } catch (error) {
-    console.error("Error parsing JSON file:", error);
-    return "Error parsing JSON content.";
-  }
 }
 
 function compareMessagesAndUpdate() {
@@ -573,108 +523,39 @@ async function updateChatInDynamoDB(
 }
 
 async function handleFileUpload(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    const extension = file.name.split(".").pop().toLowerCase();
-
+  try {    
+    // Define FileReader and upload behavior
+    let reader = new FileReader();
     reader.onload = async (event) => {
-      let fileContent = ""; // Variable to store the file content
-      try {
-        switch (extension) {
-          case "txt":
-          case "md":
-          case "json":
-            fileContent = event.target.result;
-            if (extension === "md") {
-              fileContent = extractTextFromMarkdown(fileContent);
-            } else if (extension === "json") {
-              fileContent = extractTextFromJson(fileContent);
-            }
-            break;
-          case "pdf":
-            fileContent = await extractTextFromPDF(event.target.result);
-            break;
-          case "docx":
-            fileContent = await extractTextFromDocx(event.target.result);
-            break;
-          case "xlsx":
-          case "xls":
-            fileContent = await extractTextFromExcel(event.target.result);
-            break;
-          case "ppt":
-          case "pptx":
-            fileContent = await extractTextFromPptx(event.target.result);
-            break;
-          case "jpg":
-          case "jpeg":
-          case "png":
-          case "gif":
-            fileContent = await extractTextFromImage(event.target.result);
-            break;
-          default:
-            reject("Unsupported file format.");
-            return;
+      const response = await fetch(
+        uploadFileURL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: file.name,
+            content: event.target.result
+          })
         }
-        resolve(fileContent); // Resolve with the content read from the file
-      } catch (error) {
-        reject(`Error processing file: ${error.message}`);
+      );
+      console.log("S3 API response status:", response.status);
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error(
+          `Failed to update S3: ${response.statusText}`,
+          responseText
+        );
       }
-    };
-
-    reader.onerror = (error) => {
-      reject(error);
-    };
-
-    if (
-      extension === "pdf" ||
-      extension === "docx" ||
-      extension === "xlsx" ||
-      extension === "xls" ||
-      extension === "ppt" ||
-      extension === "pptx" ||
-      extension === "jpg" ||
-      extension === "jpeg" ||
-      extension === "png" ||
-      extension === "gif"
-    ) {
-      reader.readAsArrayBuffer(file);
-    } else {
-      reader.readAsText(file);
+      console.log("File successfully uploaded.");
     }
-  });
-}
 
-async function extractTextFromPDF(arrayBuffer) {
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let text = "";
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    content.items.forEach((item) => {
-      text += item.str + " ";
-    });
+    // Execute upload
+    reader.readAsDataURL(file);
+  } catch (error) {
+    console.error("Error uploading file: ", error.message);
   }
-
-  return text.trim();
-}
-
-async function extractTextFromDocx(arrayBuffer) {
-  const { value } = await mammoth.extractRawText({ arrayBuffer });
-  return value.trim();
-}
-
-async function extractTextFromExcel(arrayBuffer) {
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
-  let text = "";
-
-  workbook.SheetNames.forEach((sheetName) => {
-    const worksheet = workbook.Sheets[sheetName];
-    const sheetText = XLSX.utils.sheet_to_csv(worksheet);
-    text += sheetText + "\n";
-  });
-
-  return text.trim();
 }
 
 fetchOpenAIKey().then(() => {
@@ -774,19 +655,19 @@ fetchOpenAIKey().then(() => {
 
       if (file) {
         const fileContent = await handleFileUpload(file);
-        const fileName = file.name;
+        // const fileName = file.name;
 
-        addMessageToChat("User", `${message}\n\nFile: ${fileName}`, false);
+        // addMessageToChat("User", `${message}\n\nFile: ${fileName}`, false);
 
-        combinedMessage += `**User:** ${message}`;
-        combinedMessage += `\n\n**Attached File Content:**\n${fileContent}`;
+        // combinedMessage += `**User:** ${message}`;
+        // combinedMessage += `\n\n**Attached File Content:**\n${fileContent}`;
 
-        console.log(
-          "Calling fetchChatbotResponse with combinedMessage:",
-          combinedMessage
-        );
+        // console.log(
+        //   "Calling fetchChatbotResponse with combinedMessage:",
+        //   combinedMessage
+        // );
 
-        fetchChatbotResponse(combinedMessage); // Make sure this is called correctly
+        // fetchChatbotResponse(combinedMessage); // Make sure this is called correctly
       } else if (message !== "") {
         addMessageToChat("User", message, false);
         combinedMessage += `**User:** ${message}`;
