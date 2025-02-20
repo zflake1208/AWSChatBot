@@ -45,6 +45,7 @@ let createChatURL = "https://gnafpvqyqyayakqy5n5i2tpq3q0plbbz.lambda-url.us-east
 let getOpenAIKeyURL = "https://b3fts76rqvydafmqz6vkhmwttq0xatii.lambda-url.us-east-2.on.aws/";
 let loadChatFromHistoryURL = "https://cwgbszgsgyvsc5ewigmz7c5kmq0bewmz.lambda-url.us-east-2.on.aws/";
 let uploadFileURL = "https://vq2wr3dimmfeh4tftqd4msyeae0horoc.lambda-url.us-east-2.on.aws/";
+let claudeURL = "https://uccx2xyafhvzkhbkielwjahmia0vjrqm.lambda-url.us-east-2.on.aws/";
 
 //Used
 function resetChatVariables() {
@@ -231,9 +232,8 @@ async function handleNewChat() {
   clearChat();
 
   chatName = "New Chat";
-  const chatMessage = "";
 
-  currentChatRecord = await createNewChatInDynamoDB(chatName, chatMessage);
+  currentChatRecord = "chat-" + new Date().toISOString().replace(/[:.]/g, "-");
 
   if (currentChatRecord) {
     currentChatID = chatName;
@@ -377,6 +377,60 @@ async function fetchOpenAIKey() {
   }
 }
 
+async function fetchClaudeResponse(prompt) {
+  console.log("fetchChatbotResponse called with message:", prompt); // Debug line
+
+  if (!openAIKey) {
+    console.error("OpenAI API key is not loaded.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      claudeURL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: prompt
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed with status ${response.status}: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("Cluade Response:", data); // Debug line to check the API response
+
+    if (data) {
+      let botMessage = data.botResponse;
+
+      // Manually prepend "Claude:" after cleanup
+      historicalChatContent += `\n\n**Claude:** ${botMessage}`;
+
+      addMessageToChat("Claude", botMessage, true);
+      contextMemory = historicalChatContent;
+      saveChatHistory();
+
+      compareMessagesAndUpdate();
+    } else {
+      addMessageToChat(
+        "Claude",
+        "Sorry, I didn't get a valid response from the server."
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching chatbot response:", error);
+  }
+}
+
+// Will be removed later.
 async function fetchChatbotResponse(message) {
   console.log("fetchChatbotResponse called with message:", message); // Debug line
 
@@ -654,20 +708,7 @@ fetchOpenAIKey().then(() => {
         : "";
 
       if (file) {
-        const fileContent = await handleFileUpload(file);
-        // const fileName = file.name;
-
-        // addMessageToChat("User", `${message}\n\nFile: ${fileName}`, false);
-
-        // combinedMessage += `**User:** ${message}`;
-        // combinedMessage += `\n\n**Attached File Content:**\n${fileContent}`;
-
-        // console.log(
-        //   "Calling fetchChatbotResponse with combinedMessage:",
-        //   combinedMessage
-        // );
-
-        // fetchChatbotResponse(combinedMessage); // Make sure this is called correctly
+        await handleFileUpload(file);
       } else if (message !== "") {
         addMessageToChat("User", message, false);
         combinedMessage += `**User:** ${message}`;
@@ -676,7 +717,8 @@ fetchOpenAIKey().then(() => {
           "Calling fetchChatbotResponse with combinedMessage:",
           combinedMessage
         );
-        fetchChatbotResponse(combinedMessage); // Add a console log here too
+       // fetchChatbotResponse(combinedMessage); // Add a console log here too
+       fetchClaudeResponse(combinedMessage);
       }
 
       historicalChatContent = combinedMessage;
